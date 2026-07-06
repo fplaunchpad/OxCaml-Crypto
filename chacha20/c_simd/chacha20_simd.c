@@ -243,10 +243,40 @@ void chacha20_transform(chacha20_simd_ctx *ctx,
                         const uint8_t *in, uint8_t *out, size_t len)
 {
     int n = ctx->next;
-    for (; len > 0; len--) {
-        if (n >= 64) { chacha20_block(ctx); n = 0; }
+
+    /* Phase 1: drain any leftover bytes from a previously generated partial block. */
+    while (n < 64 && len > 0) {
         *out++ = *in++ ^ ctx->output[n++];
+        len--;
     }
+
+    /* Phase 2: process complete 64-byte blocks with four SIMD XOR operations.
+       Mirrors OxCaml chacha20_crypt: store/load 4×16 bytes per block
+       instead of 64 scalar byte XORs. */
+    while (len >= 64) {
+        chacha20_block(ctx);
+        __m128i k0 = _mm_loadu_si128((const __m128i *)(ctx->output));
+        __m128i k1 = _mm_loadu_si128((const __m128i *)(ctx->output + 16));
+        __m128i k2 = _mm_loadu_si128((const __m128i *)(ctx->output + 32));
+        __m128i k3 = _mm_loadu_si128((const __m128i *)(ctx->output + 48));
+        _mm_storeu_si128((__m128i *)(out),    _mm_xor_si128(_mm_loadu_si128((const __m128i *)(in)),    k0));
+        _mm_storeu_si128((__m128i *)(out+16), _mm_xor_si128(_mm_loadu_si128((const __m128i *)(in+16)), k1));
+        _mm_storeu_si128((__m128i *)(out+32), _mm_xor_si128(_mm_loadu_si128((const __m128i *)(in+32)), k2));
+        _mm_storeu_si128((__m128i *)(out+48), _mm_xor_si128(_mm_loadu_si128((const __m128i *)(in+48)), k3));
+        in += 64; out += 64; len -= 64;
+        n = 64;
+    }
+
+    /* Phase 3: handle any remaining bytes (< 64) with scalar XOR. */
+    if (len > 0) {
+        chacha20_block(ctx);
+        n = 0;
+        while (len > 0) {
+            *out++ = *in++ ^ ctx->output[n++];
+            len--;
+        }
+    }
+
     ctx->next = n;
 }
 
