@@ -161,11 +161,17 @@ static void chacha20_block(chacha20_simd_ctx *ctx)
     /* Save initial state for the final addition */
     const __m128i a0 = a, b0 = b, c0 = c, d0 = d;
 
-    /* 10 double-rounds = 20 rounds total */
-    int i;
-    for (i = 0; i < 10; i++) {
-        DOUBLE_ROUND(a, b, c, d, r16, r8)
-    }
+    /* 10 double-rounds = 20 rounds total — unrolled to match OxCaml source structure */
+    DOUBLE_ROUND(a, b, c, d, r16, r8)
+    DOUBLE_ROUND(a, b, c, d, r16, r8)
+    DOUBLE_ROUND(a, b, c, d, r16, r8)
+    DOUBLE_ROUND(a, b, c, d, r16, r8)
+    DOUBLE_ROUND(a, b, c, d, r16, r8)
+    DOUBLE_ROUND(a, b, c, d, r16, r8)
+    DOUBLE_ROUND(a, b, c, d, r16, r8)
+    DOUBLE_ROUND(a, b, c, d, r16, r8)
+    DOUBLE_ROUND(a, b, c, d, r16, r8)
+    DOUBLE_ROUND(a, b, c, d, r16, r8)
 
     /* Add initial state back — mirrors OxCaml `vec_add a s0` etc. */
     a = VEC_ADD(a, a0);
