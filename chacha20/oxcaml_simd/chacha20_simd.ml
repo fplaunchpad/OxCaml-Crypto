@@ -97,15 +97,14 @@ let constant_bytes = Bytes.of_string "expand 32-byte k"
 (* ---- Internal block core: writes keystream into a pre-allocated buffer ---- *)
 (* ctr_nonce must be 16 bytes: [counter_le32 | nonce_12bytes].
    out must be 64 bytes. Caller owns both buffers — no allocation here.
-   Eliminates the 2 Bytes.create C calls and 1 Bytes.blit C call that
-   chacha20_block pays per invocation. *)
-let chacha20_block_into ~(key : bytes) ~(ctr_nonce : bytes) (out : bytes) =
-  let s0 = load constant_bytes 0 in
+   Opt06: s0 (constant_bytes), mask16, and mask8 are immutable across all block
+   calls; callers preload them once and pass as unboxed int32x4 parameters,
+   eliminating 7 instructions (1 GOTPCREL + 3 movq derefs + 3 vmovupd) per call. *)
+let chacha20_block_into ~(s0 : int32x4) ~(mask16 : int32x4) ~(mask8 : int32x4)
+                        ~(key : bytes) ~(ctr_nonce : bytes) (out : bytes) =
   let s1 = load key 0 in
   let s2 = load key 16 in
   let s3 = load ctr_nonce 0 in
-  let mask16 = load rot16_mask_bytes 0 in
-  let mask8  = load rot8_mask_bytes  0 in
   let (a,b,c,d) = double_round mask16 mask8 s0 s1 s2 s3 in
   let (a,b,c,d) = double_round mask16 mask8 a  b  c  d  in
   let (a,b,c,d) = double_round mask16 mask8 a  b  c  d  in
@@ -130,14 +129,19 @@ let chacha20_block ~(key : bytes) ~(nonce : bytes) ~counter =
   Bytes.set ctr_nonce 3 (Char.chr ((counter lsr 24) land 0xFF));
   Bytes.blit nonce 0 ctr_nonce 4 12;
   let out = Bytes.create 64 in
-  chacha20_block_into ~key ~ctr_nonce out;
+  let s0     = load constant_bytes 0 in
+  let mask16 = load rot16_mask_bytes 0 in
+  let mask8  = load rot8_mask_bytes  0 in
+  chacha20_block_into ~s0 ~mask16 ~mask8 ~key ~ctr_nonce out;
   out
 
 (* ---- ChaCha20 stream cipher (RFC 7539 §2.4) ------------------------------- *)
 (* Opt04: allocate ctr_nonce and keystream buffer once per chacha20_crypt call.
    The nonce portion (bytes 4-15) is blitted once; only bytes 0-3 (the counter)
    are updated each iteration via Bytes.unsafe_set — safe because ctr_nonce is
-   a locally-created 16-byte buffer and indices 0-3 are provably in bounds. *)
+   a locally-created 16-byte buffer and indices 0-3 are provably in bounds.
+   Opt06: s0, mask16, mask8 are immutable; loaded once here and passed to every
+   chacha20_block_into call, eliminating the per-call GOT→closure→field chain. *)
 let chacha20_crypt ~(key : bytes) ~(nonce : bytes) ~(initial_counter : int) (msg : bytes) =
   let len = Bytes.length msg in
   let out = Bytes.copy msg in
@@ -145,13 +149,16 @@ let chacha20_crypt ~(key : bytes) ~(nonce : bytes) ~(initial_counter : int) (msg
   let ctr_nonce = Bytes.create 16 in
   Bytes.blit nonce 0 ctr_nonce 4 12;
   let ks = Bytes.create 64 in
+  let s0     = load constant_bytes 0 in
+  let mask16 = load rot16_mask_bytes 0 in
+  let mask8  = load rot8_mask_bytes  0 in
   for i = 0 to nblocks - 1 do
     let ctr = initial_counter + i in
     Bytes.unsafe_set ctr_nonce 0 (Char.unsafe_chr ( ctr         land 0xFF));
     Bytes.unsafe_set ctr_nonce 1 (Char.unsafe_chr ((ctr lsr  8) land 0xFF));
     Bytes.unsafe_set ctr_nonce 2 (Char.unsafe_chr ((ctr lsr 16) land 0xFF));
     Bytes.unsafe_set ctr_nonce 3 (Char.unsafe_chr ((ctr lsr 24) land 0xFF));
-    chacha20_block_into ~key ~ctr_nonce ks;
+    chacha20_block_into ~s0 ~mask16 ~mask8 ~key ~ctr_nonce ks;
     let base = i * 64 in
     store out  base      (vec_xor (load ks  0) (load out  base     ));
     store out (base+16)  (vec_xor (load ks 16) (load out (base+16) ));
@@ -165,7 +172,7 @@ let chacha20_crypt ~(key : bytes) ~(nonce : bytes) ~(initial_counter : int) (msg
     Bytes.unsafe_set ctr_nonce 1 (Char.unsafe_chr ((ctr lsr  8) land 0xFF));
     Bytes.unsafe_set ctr_nonce 2 (Char.unsafe_chr ((ctr lsr 16) land 0xFF));
     Bytes.unsafe_set ctr_nonce 3 (Char.unsafe_chr ((ctr lsr 24) land 0xFF));
-    chacha20_block_into ~key ~ctr_nonce ks;
+    chacha20_block_into ~s0 ~mask16 ~mask8 ~key ~ctr_nonce ks;
     let base = nblocks * 64 in
     for j = 0 to rem - 1 do
       Bytes.set out (base + j)
