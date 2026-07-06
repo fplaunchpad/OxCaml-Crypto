@@ -107,15 +107,21 @@ let chacha20_block ~(key : bytes) ~(nonce : bytes) ~counter =
   let s1 = load key 0 in
   let s2 = load key 16 in
   let s3 = load ctr_nonce 0 in
-  (* Load PSHUFB masks once here, outside the 10-iteration loop. *)
+  (* Load PSHUFB masks once; keep in registers across all 10 double-rounds. *)
   let mask16 = load rot16_mask_bytes 0 in
   let mask8  = load rot8_mask_bytes  0 in
-  (* 10 double-rounds = 20 rounds total *)
-  let rec loop n a b c d =
-    if n = 0 then (a, b, c, d)
-    else let (a, b, c, d) = double_round mask16 mask8 a b c d in loop (n-1) a b c d
-  in
-  let (a, b, c, d) = loop 10 s0 s1 s2 s3 in
+  (* 10 double-rounds = 20 rounds, fully unrolled — eliminates the recursive
+     loop's GC boxing overhead (4 heap allocs × 10 iters = 40 per block). *)
+  let (a,b,c,d) = double_round mask16 mask8 s0 s1 s2 s3 in
+  let (a,b,c,d) = double_round mask16 mask8 a  b  c  d  in
+  let (a,b,c,d) = double_round mask16 mask8 a  b  c  d  in
+  let (a,b,c,d) = double_round mask16 mask8 a  b  c  d  in
+  let (a,b,c,d) = double_round mask16 mask8 a  b  c  d  in
+  let (a,b,c,d) = double_round mask16 mask8 a  b  c  d  in
+  let (a,b,c,d) = double_round mask16 mask8 a  b  c  d  in
+  let (a,b,c,d) = double_round mask16 mask8 a  b  c  d  in
+  let (a,b,c,d) = double_round mask16 mask8 a  b  c  d  in
+  let (a,b,c,d) = double_round mask16 mask8 a  b  c  d  in
   let out = Bytes.create 64 in
   store out  0 (vec_add a s0);
   store out 16 (vec_add b s1);
