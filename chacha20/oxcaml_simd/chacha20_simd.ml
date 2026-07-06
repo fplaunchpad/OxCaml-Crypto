@@ -94,24 +94,18 @@ let[@inline] double_round mask16 mask8 a b c d =
 (* ---- ChaCha20 constants: "expand 32-byte k" in LE ------------------------ *)
 let constant_bytes = Bytes.of_string "expand 32-byte k"
 
-(* ---- ChaCha20 block function (RFC 7539 §2.3) ------------------------------ *)
-let chacha20_block ~(key : bytes) ~(nonce : bytes) ~counter =
-  (* Build row3: [counter_le32 || nonce_12bytes] *)
-  let ctr_nonce = Bytes.create 16 in
-  Bytes.set ctr_nonce 0 (Char.chr ( counter         land 0xFF));
-  Bytes.set ctr_nonce 1 (Char.chr ((counter lsr  8) land 0xFF));
-  Bytes.set ctr_nonce 2 (Char.chr ((counter lsr 16) land 0xFF));
-  Bytes.set ctr_nonce 3 (Char.chr ((counter lsr 24) land 0xFF));
-  Bytes.blit nonce 0 ctr_nonce 4 12;
+(* ---- Internal block core: writes keystream into a pre-allocated buffer ---- *)
+(* ctr_nonce must be 16 bytes: [counter_le32 | nonce_12bytes].
+   out must be 64 bytes. Caller owns both buffers — no allocation here.
+   Eliminates the 2 Bytes.create C calls and 1 Bytes.blit C call that
+   chacha20_block pays per invocation. *)
+let chacha20_block_into ~(key : bytes) ~(ctr_nonce : bytes) (out : bytes) =
   let s0 = load constant_bytes 0 in
   let s1 = load key 0 in
   let s2 = load key 16 in
   let s3 = load ctr_nonce 0 in
-  (* Load PSHUFB masks once; keep in registers across all 10 double-rounds. *)
   let mask16 = load rot16_mask_bytes 0 in
   let mask8  = load rot8_mask_bytes  0 in
-  (* 10 double-rounds = 20 rounds, fully unrolled — eliminates the recursive
-     loop's GC boxing overhead (4 heap allocs × 10 iters = 40 per block). *)
   let (a,b,c,d) = double_round mask16 mask8 s0 s1 s2 s3 in
   let (a,b,c,d) = double_round mask16 mask8 a  b  c  d  in
   let (a,b,c,d) = double_round mask16 mask8 a  b  c  d  in
@@ -122,20 +116,42 @@ let chacha20_block ~(key : bytes) ~(nonce : bytes) ~counter =
   let (a,b,c,d) = double_round mask16 mask8 a  b  c  d  in
   let (a,b,c,d) = double_round mask16 mask8 a  b  c  d  in
   let (a,b,c,d) = double_round mask16 mask8 a  b  c  d  in
-  let out = Bytes.create 64 in
   store out  0 (vec_add a s0);
   store out 16 (vec_add b s1);
   store out 32 (vec_add c s2);
-  store out 48 (vec_add d s3);
+  store out 48 (vec_add d s3)
+
+(* ---- ChaCha20 block function (RFC 7539 §2.3) ------------------------------ *)
+let chacha20_block ~(key : bytes) ~(nonce : bytes) ~counter =
+  let ctr_nonce = Bytes.create 16 in
+  Bytes.set ctr_nonce 0 (Char.chr ( counter         land 0xFF));
+  Bytes.set ctr_nonce 1 (Char.chr ((counter lsr  8) land 0xFF));
+  Bytes.set ctr_nonce 2 (Char.chr ((counter lsr 16) land 0xFF));
+  Bytes.set ctr_nonce 3 (Char.chr ((counter lsr 24) land 0xFF));
+  Bytes.blit nonce 0 ctr_nonce 4 12;
+  let out = Bytes.create 64 in
+  chacha20_block_into ~key ~ctr_nonce out;
   out
 
 (* ---- ChaCha20 stream cipher (RFC 7539 §2.4) ------------------------------- *)
+(* Opt04: allocate ctr_nonce and keystream buffer once per chacha20_crypt call.
+   The nonce portion (bytes 4-15) is blitted once; only bytes 0-3 (the counter)
+   are updated each iteration via Bytes.unsafe_set — safe because ctr_nonce is
+   a locally-created 16-byte buffer and indices 0-3 are provably in bounds. *)
 let chacha20_crypt ~(key : bytes) ~(nonce : bytes) ~(initial_counter : int) (msg : bytes) =
   let len = Bytes.length msg in
   let out = Bytes.copy msg in
   let nblocks = len / 64 in
+  let ctr_nonce = Bytes.create 16 in
+  Bytes.blit nonce 0 ctr_nonce 4 12;
+  let ks = Bytes.create 64 in
   for i = 0 to nblocks - 1 do
-    let ks   = chacha20_block ~key ~nonce ~counter:(initial_counter + i) in
+    let ctr = initial_counter + i in
+    Bytes.unsafe_set ctr_nonce 0 (Char.chr ( ctr         land 0xFF));
+    Bytes.unsafe_set ctr_nonce 1 (Char.chr ((ctr lsr  8) land 0xFF));
+    Bytes.unsafe_set ctr_nonce 2 (Char.chr ((ctr lsr 16) land 0xFF));
+    Bytes.unsafe_set ctr_nonce 3 (Char.chr ((ctr lsr 24) land 0xFF));
+    chacha20_block_into ~key ~ctr_nonce ks;
     let base = i * 64 in
     store out  base      (vec_xor (load ks  0) (load out  base     ));
     store out (base+16)  (vec_xor (load ks 16) (load out (base+16) ));
@@ -144,7 +160,12 @@ let chacha20_crypt ~(key : bytes) ~(nonce : bytes) ~(initial_counter : int) (msg
   done;
   let rem = len land 63 in
   if rem > 0 then begin
-    let ks   = chacha20_block ~key ~nonce ~counter:(initial_counter + nblocks) in
+    let ctr = initial_counter + nblocks in
+    Bytes.unsafe_set ctr_nonce 0 (Char.chr ( ctr         land 0xFF));
+    Bytes.unsafe_set ctr_nonce 1 (Char.chr ((ctr lsr  8) land 0xFF));
+    Bytes.unsafe_set ctr_nonce 2 (Char.chr ((ctr lsr 16) land 0xFF));
+    Bytes.unsafe_set ctr_nonce 3 (Char.chr ((ctr lsr 24) land 0xFF));
+    chacha20_block_into ~key ~ctr_nonce ks;
     let base = nblocks * 64 in
     for j = 0 to rem - 1 do
       Bytes.set out (base + j)
