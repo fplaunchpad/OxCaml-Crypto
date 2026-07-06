@@ -147,10 +147,10 @@ let chacha20_crypt ~(key : bytes) ~(nonce : bytes) ~(initial_counter : int) (msg
   let ks = Bytes.create 64 in
   for i = 0 to nblocks - 1 do
     let ctr = initial_counter + i in
-    Bytes.unsafe_set ctr_nonce 0 (Char.chr ( ctr         land 0xFF));
-    Bytes.unsafe_set ctr_nonce 1 (Char.chr ((ctr lsr  8) land 0xFF));
-    Bytes.unsafe_set ctr_nonce 2 (Char.chr ((ctr lsr 16) land 0xFF));
-    Bytes.unsafe_set ctr_nonce 3 (Char.chr ((ctr lsr 24) land 0xFF));
+    Bytes.unsafe_set ctr_nonce 0 (Char.unsafe_chr ( ctr         land 0xFF));
+    Bytes.unsafe_set ctr_nonce 1 (Char.unsafe_chr ((ctr lsr  8) land 0xFF));
+    Bytes.unsafe_set ctr_nonce 2 (Char.unsafe_chr ((ctr lsr 16) land 0xFF));
+    Bytes.unsafe_set ctr_nonce 3 (Char.unsafe_chr ((ctr lsr 24) land 0xFF));
     chacha20_block_into ~key ~ctr_nonce ks;
     let base = i * 64 in
     store out  base      (vec_xor (load ks  0) (load out  base     ));
@@ -161,10 +161,10 @@ let chacha20_crypt ~(key : bytes) ~(nonce : bytes) ~(initial_counter : int) (msg
   let rem = len land 63 in
   if rem > 0 then begin
     let ctr = initial_counter + nblocks in
-    Bytes.unsafe_set ctr_nonce 0 (Char.chr ( ctr         land 0xFF));
-    Bytes.unsafe_set ctr_nonce 1 (Char.chr ((ctr lsr  8) land 0xFF));
-    Bytes.unsafe_set ctr_nonce 2 (Char.chr ((ctr lsr 16) land 0xFF));
-    Bytes.unsafe_set ctr_nonce 3 (Char.chr ((ctr lsr 24) land 0xFF));
+    Bytes.unsafe_set ctr_nonce 0 (Char.unsafe_chr ( ctr         land 0xFF));
+    Bytes.unsafe_set ctr_nonce 1 (Char.unsafe_chr ((ctr lsr  8) land 0xFF));
+    Bytes.unsafe_set ctr_nonce 2 (Char.unsafe_chr ((ctr lsr 16) land 0xFF));
+    Bytes.unsafe_set ctr_nonce 3 (Char.unsafe_chr ((ctr lsr 24) land 0xFF));
     chacha20_block_into ~key ~ctr_nonce ks;
     let base = nblocks * 64 in
     for j = 0 to rem - 1 do
