@@ -15,7 +15,6 @@ let[@inline] u32to8_le (buf : bytes) pos v =
   Bytes.unsafe_set buf (pos + 3)  (Char.unsafe_chr ((v lsr 24)  land 0xFF))
 
 let[@inline] rotate v c =
-  let v = mask32 v in
   mask32 ((v lsl c) lor (v lsr (32 - c)))
 
 (* Opt01: purely functional quarterround; inlined at every call site so the
