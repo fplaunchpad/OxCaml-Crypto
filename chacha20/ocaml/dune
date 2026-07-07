@@ -3,3 +3,8 @@
  (modules chacha20 benchmark_chacha20)
  (libraries unix)
  (modes native))
+
+(executable
+ (name chacha20_tests)
+ (modules chacha20 chacha20_tests)
+ (modes native))
