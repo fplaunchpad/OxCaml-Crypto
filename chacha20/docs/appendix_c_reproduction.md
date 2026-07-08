@@ -1,0 +1,217 @@
+# Appendix C: Reproduction Guide
+
+This guide covers everything needed to reproduce the study results from source: compiler versions, build commands, correctness tests, benchmarks, and graph generation.
+
+---
+
+## Compiler and Tool Versions
+
+| Tool | Version used |
+|---|---|
+| OCaml / OxCaml | 5.4.0+ox (opam switch: `oxcaml-dev`) |
+| GCC | 13.3.0 (Ubuntu 13.3.0-6ubuntu2~24.04.1) |
+| opam switch | `oxcaml-dev` (oxcaml-dev.20260108) |
+| dune | 3.0+ |
+| Python | 3.x (for graph generation) |
+| matplotlib | any recent version |
+| pandas | any recent version |
+
+**Important:** The OxCaml SIMD implementation requires the `oxcaml-dev` opam switch with `[@@builtin]` SIMD support. Standard OCaml 5.x does not support `int32x4` or `[@@builtin]` SIMD externals.
+
+---
+
+## Repository Layout
+
+```
+chacha20/
+├── c/                     C scalar implementation
+├── c_simd/                C SIMD implementation  
+├── ocaml/                 OCaml scalar implementation
+├── oxcaml_simd/           OxCaml SIMD implementation
+├── benchmarks/
+│   ├── input_*.txt        Benchmark input files (1–100 MB)
+│   ├── key.txt            32-byte benchmark key
+│   ├── nonce.txt          12-byte benchmark nonce
+│   └── results/           CSV results and PNG graphs
+├── scripts/               Benchmark runner shell scripts
+└── docs/                  This documentation
+```
+
+---
+
+## Step 1: Set the Correct opam Switch
+
+All builds (OCaml scalar, OxCaml SIMD) require the `oxcaml-dev` switch:
+
+```bash
+opam switch oxcaml-dev
+eval $(opam env)
+```
+
+Verify:
+```bash
+ocaml --version
+# Expected: The OCaml toplevel, version 5.4.0+ox
+```
+
+---
+
+## Step 2: Build All Implementations
+
+### C Scalar
+
+```bash
+cd chacha20/c
+gcc -O3 -march=native -o benchmark_chacha20 benchmark_chacha20.c chacha20.c
+```
+
+### C SIMD
+
+```bash
+cd chacha20/c_simd
+make
+# Equivalent: gcc -O3 -march=native -o benchmark_chacha20_simd chacha20_simd.c benchmark_chacha20_simd.c
+```
+
+### OCaml Scalar
+
+```bash
+cd chacha20/ocaml
+opam exec -- dune build
+# Binary: ./_build/default/benchmark_chacha20.exe
+```
+
+### OxCaml SIMD
+
+```bash
+cd chacha20/oxcaml_simd
+opam exec -- dune build
+# Binary: ./_build/default/benchmark_chacha20_simd.exe
+```
+
+---
+
+## Step 3: Run Correctness Tests
+
+### OCaml Scalar
+
+```bash
+cd chacha20/ocaml
+opam exec -- dune exec ./chacha20_tests.exe
+# No output = all tests pass. Non-zero exit = failure.
+```
+
+### OxCaml SIMD
+
+```bash
+cd chacha20/oxcaml_simd
+opam exec -- dune exec ./chacha20_simd_tests.exe
+```
+
+### C Scalar (inline check)
+
+The benchmark binary includes a correctness check that runs before benchmarking:
+
+```bash
+cd chacha20/c
+./benchmark_chacha20 ../benchmarks/input_1mb.txt \
+    ../benchmarks/key.txt ../benchmarks/nonce.txt
+# Look for: "Correctness: PASS"
+```
+
+---
+
+## Step 4: Run Benchmarks and Generate Final CSVs
+
+Four shell scripts in `chacha20/scripts/` regenerate the four final comparison CSVs. Each script builds (or rebuilds) its implementation, runs all six input sizes, and writes to `benchmarks/results/`.
+
+```bash
+# From chacha20/scripts/
+
+bash run_chacha20_c.sh
+# Writes: benchmarks/results/c_results.csv
+
+bash run_chacha20_ocaml.sh
+# Writes: benchmarks/results/ocaml_results.csv
+
+bash run_chacha20_c_simd.sh
+# Writes: benchmarks/results/c_simd_results.csv
+
+bash run_chacha20_oxcaml_simd.sh
+# Writes: benchmarks/results/oxcaml_simd_results.csv
+```
+
+Each script runs the benchmark for input sizes: 1, 10, 30, 50, 75, 100 MB.
+
+**Note on timing:** Running all four scripts takes approximately 5–10 minutes depending on hardware. Each benchmark input file is processed once.
+
+**Note on current code state:** `run_chacha20_ocaml.sh` benchmarks whichever version of `chacha20.ml` is currently in the `ocaml/` directory. The current state is Opt02 (the final kept state). If you have made local changes, the script will benchmark those changes.
+
+---
+
+## Step 5: Generate Graphs
+
+### Comparison Graphs (4 graphs — final state of all implementations)
+
+```bash
+cd chacha20/benchmarks/results
+python3 graphs.py
+```
+
+Generates:
+- `encryption_speed_comparison.png`
+- `decryption_speed_comparison.png`
+- `encryption_time_comparison.png`
+- `decryption_time_comparison.png`
+
+Reads from: `c_results.csv`, `ocaml_results.csv`, `c_simd_results.csv`, `oxcaml_simd_results.csv`
+
+### Optimization Progress Graphs (8 graphs — all stages including reverted)
+
+```bash
+cd chacha20/benchmarks/results
+python3 progress_graphs.py
+```
+
+Generates:
+- `scalar_encrypt_speed_progress.png`
+- `scalar_decrypt_speed_progress.png`
+- `scalar_encrypt_time_progress.png`
+- `scalar_decrypt_time_progress.png`
+- `simd_encrypt_speed_progress.png`
+- `simd_decrypt_speed_progress.png`
+- `simd_encrypt_time_progress.png`
+- `simd_decrypt_time_progress.png`
+
+Reads from: historical per-stage CSVs in `ocaml_scalar/benchmarks/`, `c_simd/benchmarks/`, `oxcaml_simd/benchmarks/`, and `c_results.csv`.
+
+**Note:** The per-stage historical CSVs (`ocaml_scalar/benchmarks/*.csv`, etc.) are permanent records captured during each experiment. They are not regenerated by the `.sh` scripts. Running the `.sh` scripts updates only the four final CSVs; the historical CSVs remain unchanged.
+
+---
+
+## Step 6: Generate Assembly (Optional)
+
+To regenerate the assembly for the current OCaml scalar state:
+
+```bash
+cd chacha20/ocaml
+opam exec -- ocamlfind ocamlopt -package unix -linkpkg -S chacha20.ml
+# Produces: chacha20.s in the current directory
+```
+
+To regenerate C SIMD assembly:
+
+```bash
+cd chacha20/c_simd
+gcc -O3 -march=native -S -o chacha20_simd.s chacha20_simd.c
+```
+
+---
+
+## Notes on Reproducibility
+
+**Absolute numbers are hardware-dependent.** The throughput figures (MB/s) will differ on different hardware. What is reproducible across hardware is: the relative ordering of all four implementations, the direction and approximate magnitude of each optimization gain, and the assembly-level explanations.
+
+**Benchmarks measure steady-state throughput.** Running a single benchmark pass (as the scripts do) is sufficient to observe the steady-state behavior at 30 MB and above. The 1 MB result will always show warm-up effects.
+
+**OxCaml requires the oxcaml-dev switch.** Without it, the OxCaml SIMD files will not compile due to missing `int32x4` type and `[@@builtin]` SIMD support. The OCaml scalar builds with any standard OCaml 4.x or 5.x installation.
