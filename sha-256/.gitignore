@@ -1,0 +1,27 @@
+# C binaries
+c/benchmark_sha256
+c/test_sha256_rfc
+
+# OCaml build
+_build/
+*.cmi
+*.cmo
+*.cmx
+*.o
+*.a
+*.cma
+*.cmxa
+*.annot
+*.byte
+*.native
+.dune/
+
+# Benchmark inputs
+benchmarks/input_*.txt
+
+# Editor / OS
+*~
+*.swp
+.vscode/
+.idea/
+.DS_Store
