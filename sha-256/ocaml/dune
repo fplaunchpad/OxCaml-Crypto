@@ -1,0 +1,10 @@
+(executables
+ (names benchmark_sha256)
+ (modules sha256 benchmark_sha256)
+ (libraries unix)
+ (modes native))
+
+(executable
+ (name sha256_tests)
+ (modules sha256 sha256_tests)
+ (modes native))
