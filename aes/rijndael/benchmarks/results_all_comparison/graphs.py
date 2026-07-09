@@ -12,7 +12,7 @@ ocaml_fo  = pd.read_csv(os.path.join(base, "../results_final_opt/ocaml_results.c
 sizes = c["InputSizeMB"]
 
 LABELS = [
-    ("C (Final Opt)",          c,         "InputSizeMB", "#1f77b4", "o"),
+    ("C",                      c,         "InputSizeMB", "#1f77b4", "o"),
     ("OCaml (Baseline)",       ocaml,     "size_mb",     "#ff7f0e", "s"),
     ("OCaml (Opt)",            ocaml_opt, "size_mb",     "#2ca02c", "^"),
     ("OCaml (Final Opt)",      ocaml_fo,  "InputSizeMB", "#d62728", "D"),
