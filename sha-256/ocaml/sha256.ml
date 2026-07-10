@@ -78,33 +78,33 @@ let transform ctx =
   let data = ctx.data in
   (* Convert buffer data to 16 big-endian integers *)
   for i = 0 to 15 do
-    data.(i) <- get_be32 ctx.buffer (i lsl 2)
+    Array.unsafe_set data i (get_be32 ctx.buffer (i lsl 2))
   done;
   (* Expand into 80 integers (indices 64-79 computed but not consumed, matching C) *)
   for i = 16 to 79 do
-    data.(i) <-
-      (small_sigma1 data.(i-2)
-       + data.(i-7)
-       + small_sigma0 data.(i-15)
-       + data.(i-16)) land mask32
+    Array.unsafe_set data i
+      ((small_sigma1 (Array.unsafe_get data (i-2))
+        + Array.unsafe_get data (i-7)
+        + small_sigma0 (Array.unsafe_get data (i-15))
+        + Array.unsafe_get data (i-16)) land mask32)
   done;
   (* Initialize working variables *)
-  let a = ref ctx.state.(0) in
-  let b = ref ctx.state.(1) in
-  let c = ref ctx.state.(2) in
-  let d = ref ctx.state.(3) in
-  let e = ref ctx.state.(4) in
-  let f = ref ctx.state.(5) in
-  let g = ref ctx.state.(6) in
-  let h = ref ctx.state.(7) in
+  let a = ref (Array.unsafe_get ctx.state 0) in
+  let b = ref (Array.unsafe_get ctx.state 1) in
+  let c = ref (Array.unsafe_get ctx.state 2) in
+  let d = ref (Array.unsafe_get ctx.state 3) in
+  let e = ref (Array.unsafe_get ctx.state 4) in
+  let f = ref (Array.unsafe_get ctx.state 5) in
+  let g = ref (Array.unsafe_get ctx.state 6) in
+  let h = ref (Array.unsafe_get ctx.state 7) in
   (* Perform rounds: 8-way unrolled STEP macro *)
   let[@inline] step a_r b_r c_r d_r e_r f_r g_r h_r i =
     let t1 =
       (!h_r
        + big_sigma1 !e_r
        + ch !e_r !f_r !g_r
-       + constants.(i)
-       + data.(i)) land mask32 in
+       + Array.unsafe_get constants i
+       + Array.unsafe_get data i) land mask32 in
     let t2 = (big_sigma0 !a_r + maj !a_r !b_r !c_r) land mask32 in
     d_r := (!d_r + t1) land mask32;
     h_r := (t1 + t2) land mask32
@@ -121,14 +121,14 @@ let transform ctx =
     step b c d e f g h a (j+7)
   done;
   (* Update chaining values *)
-  ctx.state.(0) <- (ctx.state.(0) + !a) land mask32;
-  ctx.state.(1) <- (ctx.state.(1) + !b) land mask32;
-  ctx.state.(2) <- (ctx.state.(2) + !c) land mask32;
-  ctx.state.(3) <- (ctx.state.(3) + !d) land mask32;
-  ctx.state.(4) <- (ctx.state.(4) + !e) land mask32;
-  ctx.state.(5) <- (ctx.state.(5) + !f) land mask32;
-  ctx.state.(6) <- (ctx.state.(6) + !g) land mask32;
-  ctx.state.(7) <- (ctx.state.(7) + !h) land mask32
+  Array.unsafe_set ctx.state 0 ((Array.unsafe_get ctx.state 0 + !a) land mask32);
+  Array.unsafe_set ctx.state 1 ((Array.unsafe_get ctx.state 1 + !b) land mask32);
+  Array.unsafe_set ctx.state 2 ((Array.unsafe_get ctx.state 2 + !c) land mask32);
+  Array.unsafe_set ctx.state 3 ((Array.unsafe_get ctx.state 3 + !d) land mask32);
+  Array.unsafe_set ctx.state 4 ((Array.unsafe_get ctx.state 4 + !e) land mask32);
+  Array.unsafe_set ctx.state 5 ((Array.unsafe_get ctx.state 5 + !f) land mask32);
+  Array.unsafe_set ctx.state 6 ((Array.unsafe_get ctx.state 6 + !g) land mask32);
+  Array.unsafe_set ctx.state 7 ((Array.unsafe_get ctx.state 7 + !h) land mask32)
 
 (* SHA256_init — SHA-256 (256-bit) only *)
 let init ctx =
