@@ -27,3 +27,5 @@ benchmarks/input_*.txt
 .vscode/
 .idea/
 .DS_Store
+
+perf.data*

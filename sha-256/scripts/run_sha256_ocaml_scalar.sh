@@ -1,13 +1,14 @@
 #!/bin/bash
 set -e
+NAME="${1:-baseline}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OCAML_DIR="$SCRIPT_DIR/../ocaml"
 BENCH_DIR="$SCRIPT_DIR/../benchmarks"
-ASM_OUT="$BENCH_DIR/results/ocaml_scalar/assembly/baseline.s"
-CSV_OUT="$BENCH_DIR/results/ocaml_scalar/benchmarks/baseline.csv"
+ASM_OUT="$BENCH_DIR/results/ocaml_scalar/assembly/${NAME}.s"
+CSV_OUT="$BENCH_DIR/results/ocaml_scalar/benchmarks/${NAME}.csv"
 ACTIVE="$BENCH_DIR/results/ocaml_scalar_results.csv"
 
-mkdir -p "$(dirname "$ASM_OUT")" "$(dirname "$CSV_OUT")"
+mkdir -p "$(dirname "$ASM_OUT")" "$BENCH_DIR/results/ocaml_scalar/benchmarks"
 
 # Build benchmark binary
 cd "$OCAML_DIR"
@@ -19,7 +20,7 @@ mv sha256.s "$ASM_OUT"
 rm -f sha256.cmi sha256.cmx sha256.o
 echo "Assembly written to $ASM_OUT"
 
-# Run benchmarks
+# Run benchmarks -> named csv and active results file
 echo "InputSizeMB,HashTime,HashSpeed" > "$CSV_OUT"
 for f in \
   "$BENCH_DIR/input_1mb.txt"   \

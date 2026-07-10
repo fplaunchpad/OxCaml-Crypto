@@ -47,6 +47,7 @@ type ctx = {
   length   : int array;   (* 2 x 32-bit words: [0] = high bits, [1] = low bits *)
   mutable numbytes : int;
   buffer   : bytes;       (* 64-byte block buffer *)
+  data     : int array;   (* 80-word message schedule; hoisted to avoid per-transform alloc *)
 }
 
 let create () = {
@@ -54,6 +55,7 @@ let create () = {
   length   = Array.make 2 0;
   numbytes = 0;
   buffer   = Bytes.make 64 '\x00';
+  data     = Array.make 80 0;
 }
 
 (* Replaces SHA256_copy_and_swap (little-endian path only).
@@ -73,7 +75,7 @@ let[@inline] set_be32 buf i v =
 
 (* SHA256_transform *)
 let transform ctx =
-  let data = Array.make 80 0 in
+  let data = ctx.data in
   (* Convert buffer data to 16 big-endian integers *)
   for i = 0 to 15 do
     data.(i) <- get_be32 ctx.buffer (i lsl 2)
