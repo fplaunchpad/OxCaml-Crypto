@@ -73,12 +73,14 @@ let[@inline] set_be32 buf i v =
   Bytes.set buf (i+2)   (Char.chr ((v lsr  8) land 0xFF));
   Bytes.set buf (i+3)   (Char.chr ( v         land 0xFF))
 
-(* SHA256_transform *)
-let transform ctx =
+(* SHA256_transform — reads the first 16 words from src starting at src_offset.
+   transform is a thin wrapper that passes ctx.buffer 0 for all paths except the
+   full-block hot loop in add_data, which passes the caller's input directly. *)
+let transform_from ctx (src : bytes) (src_offset : int) =
   let data = ctx.data in
-  (* Convert buffer data to 16 big-endian integers *)
+  (* Load 16 big-endian words from src *)
   for i = 0 to 15 do
-    Array.unsafe_set data i (get_be32 ctx.buffer (i lsl 2))
+    Array.unsafe_set data i (get_be32 src (src_offset + (i lsl 2)))
   done;
   (* Expand into 80 integers (indices 64-79 computed but not consumed, matching C) *)
   for i = 16 to 79 do
@@ -158,6 +160,8 @@ let transform ctx =
     (Array.unsafe_get ctx.state 6)
     (Array.unsafe_get ctx.state 7)
 
+let transform ctx = transform_from ctx ctx.buffer 0
+
 (* SHA256_init — SHA-256 (256-bit) only *)
 let init ctx =
   ctx.state.(0) <- 0x6A09E667;
@@ -199,10 +203,10 @@ let add_data ctx (data : bytes) len =
     end
   end;
   if not !early then begin
-    (* Process data in 64-byte chunks *)
+    (* Process data in 64-byte chunks: hash directly from caller's buffer,
+       no copy to ctx.buffer needed for full blocks *)
     while !rem >= 64 do
-      Bytes.blit data !pos ctx.buffer 0 64;
-      transform ctx;
+      transform_from ctx data !pos;
       pos := !pos + 64;
       rem := !rem - 64
     done;
