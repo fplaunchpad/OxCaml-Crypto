@@ -88,47 +88,75 @@ let transform ctx =
         + small_sigma0 (Array.unsafe_get data (i-15))
         + Array.unsafe_get data (i-16)) land mask32)
   done;
-  (* Initialize working variables *)
-  let a = ref (Array.unsafe_get ctx.state 0) in
-  let b = ref (Array.unsafe_get ctx.state 1) in
-  let c = ref (Array.unsafe_get ctx.state 2) in
-  let d = ref (Array.unsafe_get ctx.state 3) in
-  let e = ref (Array.unsafe_get ctx.state 4) in
-  let f = ref (Array.unsafe_get ctx.state 5) in
-  let g = ref (Array.unsafe_get ctx.state 6) in
-  let h = ref (Array.unsafe_get ctx.state 7) in
-  (* Perform rounds: 8-way unrolled STEP macro *)
-  let[@inline] step a_r b_r c_r d_r e_r f_r g_r h_r i =
-    let t1 =
-      (!h_r
-       + big_sigma1 !e_r
-       + ch !e_r !f_r !g_r
-       + Array.unsafe_get constants i
-       + Array.unsafe_get data i) land mask32 in
-    let t2 = (big_sigma0 !a_r + maj !a_r !b_r !c_r) land mask32 in
-    d_r := (!d_r + t1) land mask32;
-    h_r := (t1 + t2) land mask32
+  (* Perform rounds: working variables carried as tail-recursive function arguments.
+     Equivalent to the ref-based 8×8 STEP pattern; each outer iteration inlines
+     the same 8 steps with immutable let-bindings instead of ref mutation. *)
+  (* Pass data and ctx explicitly so rounds has no free variables → no closure allocation.
+     constants is module-level and accessed via GOT directly inside rounds. *)
+  let rec rounds data ctx i a b c d e f g h =
+    if i > 7 then begin
+      Array.unsafe_set ctx.state 0 ((Array.unsafe_get ctx.state 0 + a) land mask32);
+      Array.unsafe_set ctx.state 1 ((Array.unsafe_get ctx.state 1 + b) land mask32);
+      Array.unsafe_set ctx.state 2 ((Array.unsafe_get ctx.state 2 + c) land mask32);
+      Array.unsafe_set ctx.state 3 ((Array.unsafe_get ctx.state 3 + d) land mask32);
+      Array.unsafe_set ctx.state 4 ((Array.unsafe_get ctx.state 4 + e) land mask32);
+      Array.unsafe_set ctx.state 5 ((Array.unsafe_get ctx.state 5 + f) land mask32);
+      Array.unsafe_set ctx.state 6 ((Array.unsafe_get ctx.state 6 + g) land mask32);
+      Array.unsafe_set ctx.state 7 ((Array.unsafe_get ctx.state 7 + h) land mask32)
+    end else begin
+      let j = i lsl 3 in
+      (* STEP(a,b,c,d,e,f,g,h,j): updates d→nd, h→nh *)
+      let t1 = (h  + big_sigma1 e   + ch e   f   g   + Array.unsafe_get constants  j    + Array.unsafe_get data  j   ) land mask32 in
+      let t2 = (big_sigma0 a  + maj a  b  c ) land mask32 in
+      let nd  = (d  + t1) land mask32 in
+      let nh  = (t1 + t2) land mask32 in
+      (* STEP(nh,a,b,c,nd,e,f,g,j+1): updates c→nc, g→ng *)
+      let t1 = (g  + big_sigma1 nd  + ch nd  e   f   + Array.unsafe_get constants (j+1) + Array.unsafe_get data (j+1)) land mask32 in
+      let t2 = (big_sigma0 nh + maj nh a  b ) land mask32 in
+      let nc  = (c  + t1) land mask32 in
+      let ng  = (t1 + t2) land mask32 in
+      (* STEP(ng,nh,a,b,nc,nd,e,f,j+2): updates b→nb, f→nf *)
+      let t1 = (f  + big_sigma1 nc  + ch nc  nd  e   + Array.unsafe_get constants (j+2) + Array.unsafe_get data (j+2)) land mask32 in
+      let t2 = (big_sigma0 ng + maj ng nh a ) land mask32 in
+      let nb  = (b  + t1) land mask32 in
+      let nf  = (t1 + t2) land mask32 in
+      (* STEP(nf,ng,nh,a,nb,nc,nd,e,j+3): updates a→na, e→ne *)
+      let t1 = (e  + big_sigma1 nb  + ch nb  nc  nd  + Array.unsafe_get constants (j+3) + Array.unsafe_get data (j+3)) land mask32 in
+      let t2 = (big_sigma0 nf + maj nf ng nh) land mask32 in
+      let na  = (a  + t1) land mask32 in
+      let ne  = (t1 + t2) land mask32 in
+      (* STEP(ne,nf,ng,nh,na,nb,nc,nd,j+4): updates nh→nh2, nd→nd2 *)
+      let t1 = (nd + big_sigma1 na  + ch na  nb  nc  + Array.unsafe_get constants (j+4) + Array.unsafe_get data (j+4)) land mask32 in
+      let t2 = (big_sigma0 ne + maj ne nf ng) land mask32 in
+      let nh2 = (nh + t1) land mask32 in
+      let nd2 = (t1 + t2) land mask32 in
+      (* STEP(nd2,ne,nf,ng,nh2,na,nb,nc,j+5): updates ng→ng2, nc→nc2 *)
+      let t1 = (nc + big_sigma1 nh2 + ch nh2 na  nb  + Array.unsafe_get constants (j+5) + Array.unsafe_get data (j+5)) land mask32 in
+      let t2 = (big_sigma0 nd2 + maj nd2 ne nf) land mask32 in
+      let ng2 = (ng + t1) land mask32 in
+      let nc2 = (t1 + t2) land mask32 in
+      (* STEP(nc2,nd2,ne,nf,ng2,nh2,na,nb,j+6): updates nf→nf2, nb→nb2 *)
+      let t1 = (nb + big_sigma1 ng2 + ch ng2 nh2 na  + Array.unsafe_get constants (j+6) + Array.unsafe_get data (j+6)) land mask32 in
+      let t2 = (big_sigma0 nc2 + maj nc2 nd2 ne) land mask32 in
+      let nf2 = (nf + t1) land mask32 in
+      let nb2 = (t1 + t2) land mask32 in
+      (* STEP(nb2,nc2,nd2,ne,nf2,ng2,nh2,na,j+7): updates ne→ne2, na→na2 *)
+      let t1 = (na + big_sigma1 nf2 + ch nf2 ng2 nh2 + Array.unsafe_get constants (j+7) + Array.unsafe_get data (j+7)) land mask32 in
+      let t2 = (big_sigma0 nb2 + maj nb2 nc2 nd2) land mask32 in
+      let ne2 = (ne + t1) land mask32 in
+      let na2 = (t1 + t2) land mask32 in
+      rounds data ctx (i+1) na2 nb2 nc2 nd2 ne2 nf2 ng2 nh2
+    end
   in
-  for i = 0 to 7 do
-    let j = i lsl 3 in
-    step a b c d e f g h  j;
-    step h a b c d e f g (j+1);
-    step g h a b c d e f (j+2);
-    step f g h a b c d e (j+3);
-    step e f g h a b c d (j+4);
-    step d e f g h a b c (j+5);
-    step c d e f g h a b (j+6);
-    step b c d e f g h a (j+7)
-  done;
-  (* Update chaining values *)
-  Array.unsafe_set ctx.state 0 ((Array.unsafe_get ctx.state 0 + !a) land mask32);
-  Array.unsafe_set ctx.state 1 ((Array.unsafe_get ctx.state 1 + !b) land mask32);
-  Array.unsafe_set ctx.state 2 ((Array.unsafe_get ctx.state 2 + !c) land mask32);
-  Array.unsafe_set ctx.state 3 ((Array.unsafe_get ctx.state 3 + !d) land mask32);
-  Array.unsafe_set ctx.state 4 ((Array.unsafe_get ctx.state 4 + !e) land mask32);
-  Array.unsafe_set ctx.state 5 ((Array.unsafe_get ctx.state 5 + !f) land mask32);
-  Array.unsafe_set ctx.state 6 ((Array.unsafe_get ctx.state 6 + !g) land mask32);
-  Array.unsafe_set ctx.state 7 ((Array.unsafe_get ctx.state 7 + !h) land mask32)
+  rounds data ctx 0
+    (Array.unsafe_get ctx.state 0)
+    (Array.unsafe_get ctx.state 1)
+    (Array.unsafe_get ctx.state 2)
+    (Array.unsafe_get ctx.state 3)
+    (Array.unsafe_get ctx.state 4)
+    (Array.unsafe_get ctx.state 5)
+    (Array.unsafe_get ctx.state 6)
+    (Array.unsafe_get ctx.state 7)
 
 (* SHA256_init — SHA-256 (256-bit) only *)
 let init ctx =
