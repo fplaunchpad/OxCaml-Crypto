@@ -62,16 +62,16 @@ let create () = {
    get_be32: load 4 bytes from buf at offset i as a big-endian 32-bit word.
    set_be32: store a 32-bit word into buf at offset i in big-endian order. *)
 let[@inline] get_be32 buf i =
-  (Char.code (Bytes.get buf  i      ) lsl 24)
-  lor (Char.code (Bytes.get buf (i+1)) lsl 16)
-  lor (Char.code (Bytes.get buf (i+2)) lsl  8)
-  lor  Char.code (Bytes.get buf (i+3))
+  (Char.code (Bytes.unsafe_get buf  i      ) lsl 24)
+  lor (Char.code (Bytes.unsafe_get buf (i+1)) lsl 16)
+  lor (Char.code (Bytes.unsafe_get buf (i+2)) lsl  8)
+  lor  Char.code (Bytes.unsafe_get buf (i+3))
 
 let[@inline] set_be32 buf i v =
-  Bytes.set buf  i      (Char.chr ((v lsr 24) land 0xFF));
-  Bytes.set buf (i+1)   (Char.chr ((v lsr 16) land 0xFF));
-  Bytes.set buf (i+2)   (Char.chr ((v lsr  8) land 0xFF));
-  Bytes.set buf (i+3)   (Char.chr ( v         land 0xFF))
+  Bytes.unsafe_set buf  i      (Char.chr ((v lsr 24) land 0xFF));
+  Bytes.unsafe_set buf (i+1)   (Char.chr ((v lsr 16) land 0xFF));
+  Bytes.unsafe_set buf (i+2)   (Char.chr ((v lsr  8) land 0xFF));
+  Bytes.unsafe_set buf (i+3)   (Char.chr ( v         land 0xFF))
 
 (* SHA256_transform — reads the first 16 words from src starting at src_offset.
    transform is a thin wrapper that passes ctx.buffer 0 for all paths except the
