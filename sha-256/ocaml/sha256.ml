@@ -10,18 +10,18 @@
 let mask32 = 0xFFFF_FFFF
 
 (* C macros: ROTR, CH, MAJ, SIGMA0, SIGMA1, sigma0, sigma1 *)
-let[@inline] rotr x n = (x lsr n) lor ((x lsl (32 - n)) land mask32)
+let[@inline] rotr x n = (x lsr n) lor (x lsl (32 - n))
 
 let[@inline] ch  x y z = z lxor (x land (y lxor z))
 let[@inline] maj x y z = (x land y) lor (z land (x lor y))
 
 (* SIGMA0 / SIGMA1 — compression round functions *)
-let[@inline] big_sigma0 x = (rotr x  2) lxor (rotr x 13) lxor (rotr x 22)
-let[@inline] big_sigma1 x = (rotr x  6) lxor (rotr x 11) lxor (rotr x 25)
+let[@inline] big_sigma0 x = ((rotr x  2) lxor (rotr x 13) lxor (rotr x 22)) land mask32
+let[@inline] big_sigma1 x = ((rotr x  6) lxor (rotr x 11) lxor (rotr x 25)) land mask32
 
 (* sigma0 / sigma1 — message schedule expansion *)
-let[@inline] small_sigma0 x = (rotr x  7) lxor (rotr x 18) lxor (x lsr  3)
-let[@inline] small_sigma1 x = (rotr x 17) lxor (rotr x 19) lxor (x lsr 10)
+let[@inline] small_sigma0 x = ((rotr x  7) lxor (rotr x 18) lxor (x lsr  3)) land mask32
+let[@inline] small_sigma1 x = ((rotr x 17) lxor (rotr x 19) lxor (x lsr 10)) land mask32
 
 let constants = [|
   0x428a2f98; 0x71374491; 0xb5c0fbcf; 0xe9b5dba5;
