@@ -128,4 +128,24 @@ let () =
   set_be32 buf4 0 #0x80000000l;
   check "set_be32→get_be32 msb-only" (get_be32 buf4 0) #0x80000000l;
 
-  Printf.printf "\nAll OxStep03 checks complete.\n"
+  Printf.printf "\nAll OxStep03 checks complete.\n";
+
+  (* --- OxStep04: transform — empty-message known-answer test ---
+     SHA-256("") = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+     Padding block: 0x80 || 55×0x00 || 0x0000000000000000 (64-bit big-endian bit count = 0) *)
+  Printf.printf "\n=== OxStep04: transform (empty-message block) ===\n";
+  let ctx2 = create () in
+  init ctx2;
+  Bytes.set  ctx2.buffer 0 '\x80';
+  Bytes.fill ctx2.buffer 1 63 '\x00';
+  transform ctx2;
+  check "transform: state[0] = e3b0c442" (aget ctx2.state 0) #0xe3b0c442l;
+  check "transform: state[1] = 98fc1c14" (aget ctx2.state 1) #0x98fc1c14l;
+  check "transform: state[2] = 9afbf4c8" (aget ctx2.state 2) #0x9afbf4c8l;
+  check "transform: state[3] = 996fb924" (aget ctx2.state 3) #0x996fb924l;
+  check "transform: state[4] = 27ae41e4" (aget ctx2.state 4) #0x27ae41e4l;
+  check "transform: state[5] = 649b934c" (aget ctx2.state 5) #0x649b934cl;
+  check "transform: state[6] = a495991b" (aget ctx2.state 6) #0xa495991bl;
+  check "transform: state[7] = 7852b855" (aget ctx2.state 7) #0x7852b855l;
+
+  Printf.printf "\nAll OxStep04 checks complete.\n"

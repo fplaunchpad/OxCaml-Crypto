@@ -131,9 +131,95 @@ let[@inline] set_be32 (buf : bytes) i (v : int32#) =
   Bytes.unsafe_set buf (i+2)   (Char.unsafe_chr (Int32_u.to_int (Int32_u.logand (Int32_u.shift_right_logical v  8) #0xffl)));
   Bytes.unsafe_set buf (i+3)   (Char.unsafe_chr (Int32_u.to_int (Int32_u.logand v #0xffl)))
 
-(* --- Not migrated in OxStep03 --- *)
+(* --- Migrated in OxStep04 --- *)
 
-let transform_from (_ctx : ctx) (_src : bytes) (_src_offset : int) = assert false
-let transform (_ctx : ctx) = assert false
+let transform_from ctx (src : bytes) (src_offset : int) =
+  let data = ctx.data in
+  (* Load 16 big-endian words from src into data[0..15] *)
+  for i = 0 to 15 do
+    aset data i (get_be32 src (src_offset + (i lsl 2)))
+  done;
+  (* Expand message schedule: data[16..79] *)
+  for i = 16 to 79 do
+    aset data i
+      (Int32_u.add
+        (Int32_u.add
+          (Int32_u.add
+            (small_sigma1 (aget data (i-2)))
+            (aget data (i-7)))
+          (small_sigma0 (aget data (i-15))))
+        (aget data (i-16)))
+  done;
+  (* Compression: 8 working variables carried as tail-recursive arguments.
+     Pass data and ctx explicitly so rounds has no free variables. *)
+  let rec rounds data ctx i a b c d e f g h =
+    if i > 7 then begin
+      aset ctx.state 0 (Int32_u.add (aget ctx.state 0) a);
+      aset ctx.state 1 (Int32_u.add (aget ctx.state 1) b);
+      aset ctx.state 2 (Int32_u.add (aget ctx.state 2) c);
+      aset ctx.state 3 (Int32_u.add (aget ctx.state 3) d);
+      aset ctx.state 4 (Int32_u.add (aget ctx.state 4) e);
+      aset ctx.state 5 (Int32_u.add (aget ctx.state 5) f);
+      aset ctx.state 6 (Int32_u.add (aget ctx.state 6) g);
+      aset ctx.state 7 (Int32_u.add (aget ctx.state 7) h)
+    end else begin
+      let j = i lsl 3 in
+      (* STEP(a,b,c,d,e,f,g,h,j): nd = d+t1, nh = t1+t2 *)
+      let t1 = Int32_u.add (Int32_u.add (Int32_u.add (Int32_u.add h  (big_sigma1 e )) (ch e  f  g )) (aget constants  j   )) (aget data  j   ) in
+      let t2 = Int32_u.add (big_sigma0 a ) (maj a  b  c ) in
+      let nd  = Int32_u.add d  t1 in
+      let nh  = Int32_u.add t1 t2 in
+      (* STEP(nh,a,b,c,nd,e,f,g,j+1): nc = c+t1, ng = t1+t2 *)
+      let t1 = Int32_u.add (Int32_u.add (Int32_u.add (Int32_u.add g  (big_sigma1 nd)) (ch nd e  f )) (aget constants (j+1))) (aget data (j+1)) in
+      let t2 = Int32_u.add (big_sigma0 nh) (maj nh a  b ) in
+      let nc  = Int32_u.add c  t1 in
+      let ng  = Int32_u.add t1 t2 in
+      (* STEP(ng,nh,a,b,nc,nd,e,f,j+2): nb = b+t1, nf = t1+t2 *)
+      let t1 = Int32_u.add (Int32_u.add (Int32_u.add (Int32_u.add f  (big_sigma1 nc)) (ch nc nd e )) (aget constants (j+2))) (aget data (j+2)) in
+      let t2 = Int32_u.add (big_sigma0 ng) (maj ng nh a ) in
+      let nb  = Int32_u.add b  t1 in
+      let nf  = Int32_u.add t1 t2 in
+      (* STEP(nf,ng,nh,a,nb,nc,nd,e,j+3): na = a+t1, ne = t1+t2 *)
+      let t1 = Int32_u.add (Int32_u.add (Int32_u.add (Int32_u.add e  (big_sigma1 nb)) (ch nb nc nd)) (aget constants (j+3))) (aget data (j+3)) in
+      let t2 = Int32_u.add (big_sigma0 nf) (maj nf ng nh) in
+      let na  = Int32_u.add a  t1 in
+      let ne  = Int32_u.add t1 t2 in
+      (* STEP(ne,nf,ng,nh,na,nb,nc,nd,j+4): nh2 = nh+t1, nd2 = t1+t2 *)
+      let t1 = Int32_u.add (Int32_u.add (Int32_u.add (Int32_u.add nd (big_sigma1 na)) (ch na nb nc)) (aget constants (j+4))) (aget data (j+4)) in
+      let t2 = Int32_u.add (big_sigma0 ne) (maj ne nf ng) in
+      let nh2 = Int32_u.add nh t1 in
+      let nd2 = Int32_u.add t1 t2 in
+      (* STEP(nd2,ne,nf,ng,nh2,na,nb,nc,j+5): ng2 = ng+t1, nc2 = t1+t2 *)
+      let t1 = Int32_u.add (Int32_u.add (Int32_u.add (Int32_u.add nc (big_sigma1 nh2)) (ch nh2 na nb)) (aget constants (j+5))) (aget data (j+5)) in
+      let t2 = Int32_u.add (big_sigma0 nd2) (maj nd2 ne nf) in
+      let ng2 = Int32_u.add ng t1 in
+      let nc2 = Int32_u.add t1 t2 in
+      (* STEP(nc2,nd2,ne,nf,ng2,nh2,na,nb,j+6): nf2 = nf+t1, nb2 = t1+t2 *)
+      let t1 = Int32_u.add (Int32_u.add (Int32_u.add (Int32_u.add nb (big_sigma1 ng2)) (ch ng2 nh2 na)) (aget constants (j+6))) (aget data (j+6)) in
+      let t2 = Int32_u.add (big_sigma0 nc2) (maj nc2 nd2 ne) in
+      let nf2 = Int32_u.add nf t1 in
+      let nb2 = Int32_u.add t1 t2 in
+      (* STEP(nb2,nc2,nd2,ne,nf2,ng2,nh2,na,j+7): ne2 = ne+t1, na2 = t1+t2 *)
+      let t1 = Int32_u.add (Int32_u.add (Int32_u.add (Int32_u.add na (big_sigma1 nf2)) (ch nf2 ng2 nh2)) (aget constants (j+7))) (aget data (j+7)) in
+      let t2 = Int32_u.add (big_sigma0 nb2) (maj nb2 nc2 nd2) in
+      let ne2 = Int32_u.add ne t1 in
+      let na2 = Int32_u.add t1 t2 in
+      rounds data ctx (i+1) na2 nb2 nc2 nd2 ne2 nf2 ng2 nh2
+    end
+  in
+  rounds data ctx 0
+    (aget ctx.state 0)
+    (aget ctx.state 1)
+    (aget ctx.state 2)
+    (aget ctx.state 3)
+    (aget ctx.state 4)
+    (aget ctx.state 5)
+    (aget ctx.state 6)
+    (aget ctx.state 7)
+
+let transform ctx = transform_from ctx ctx.buffer 0
+
+(* --- Not migrated in OxStep04 --- *)
+
 let add_data (_ctx : ctx) (_data : bytes) (_len : int) = assert false
 let finish (_ctx : ctx) (_output : bytes) = assert false
