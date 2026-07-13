@@ -151,8 +151,8 @@ let transform_from ctx (src : bytes) (src_offset : int) =
         (aget data (i-16)))
   done;
   (* Compression: 8 working variables carried as tail-recursive arguments.
-     Pass data and ctx explicitly so rounds has no free variables. *)
-  let rec rounds data ctx i a b c d e f g h =
+     Pass data, ctx, and constants explicitly so rounds has no free variables. *)
+  let rec rounds constants data ctx i a b c d e f g h =
     if i > 7 then begin
       aset ctx.state 0 (Int32_u.add (aget ctx.state 0) a);
       aset ctx.state 1 (Int32_u.add (aget ctx.state 1) b);
@@ -204,10 +204,10 @@ let transform_from ctx (src : bytes) (src_offset : int) =
       let t2 = Int32_u.add (big_sigma0 nb2) (maj nb2 nc2 nd2) in
       let ne2 = Int32_u.add ne t1 in
       let na2 = Int32_u.add t1 t2 in
-      rounds data ctx (i+1) na2 nb2 nc2 nd2 ne2 nf2 ng2 nh2
+      rounds constants data ctx (i+1) na2 nb2 nc2 nd2 ne2 nf2 ng2 nh2
     end
   in
-  rounds data ctx 0
+  rounds constants data ctx 0
     (aget ctx.state 0)
     (aget ctx.state 1)
     (aget ctx.state 2)
