@@ -29,3 +29,4 @@ benchmarks/input_*.txt
 .DS_Store
 
 perf.data*
+oxcaml/*.s

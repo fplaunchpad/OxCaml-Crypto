@@ -1,0 +1,6 @@
+(executable
+ (name oxcaml_validate)
+ (modules oxcaml_validate)
+ (libraries stdlib_upstream_compatible)
+ (ocamlopt_flags (:standard -extension layout_poly -O3))
+ (modes native))
