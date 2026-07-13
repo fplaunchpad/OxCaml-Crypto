@@ -93,13 +93,45 @@ type ctx = {
   data     : int32# array;  (* 80 words × 4 bytes = 320 bytes, unboxed *)
 }
 
-(* --- Not migrated in OxStep02 --- *)
+(* --- Migrated in OxStep03 --- *)
 
-let create () = (assert false : ctx)
-let init (_ctx : ctx) = assert false
+let create () = {
+  state    = makearray_dynamic 8 #0l;
+  length   = Array.make 2 0;
+  numbytes = 0;
+  buffer   = Bytes.make 64 '\x00';
+  data     = makearray_dynamic 80 #0l;
+}
 
-let get_be32 (_buf : bytes) (_i : int) = (assert false : int32#)
-let set_be32 (_buf : bytes) (_i : int) (_v : int32#) = assert false
+let init ctx =
+  aset ctx.state 0 #0x6a09e667l;
+  aset ctx.state 1 #0xbb67ae85l;
+  aset ctx.state 2 #0x3c6ef372l;
+  aset ctx.state 3 #0xa54ff53al;
+  aset ctx.state 4 #0x510e527fl;
+  aset ctx.state 5 #0x9b05688cl;
+  aset ctx.state 6 #0x1f83d9abl;
+  aset ctx.state 7 #0x5be0cd19l;
+  ctx.numbytes <- 0;
+  ctx.length.(0) <- 0;
+  ctx.length.(1) <- 0
+
+let[@inline] get_be32 (buf : bytes) i : int32# =
+  let b0 = Int32_u.of_int (Char.code (Bytes.unsafe_get buf  i      )) in
+  let b1 = Int32_u.of_int (Char.code (Bytes.unsafe_get buf (i+1))) in
+  let b2 = Int32_u.of_int (Char.code (Bytes.unsafe_get buf (i+2))) in
+  let b3 = Int32_u.of_int (Char.code (Bytes.unsafe_get buf (i+3))) in
+  Int32_u.logor
+    (Int32_u.logor (Int32_u.shift_left b0 24) (Int32_u.shift_left b1 16))
+    (Int32_u.logor (Int32_u.shift_left b2  8)  b3)
+
+let[@inline] set_be32 (buf : bytes) i (v : int32#) =
+  Bytes.unsafe_set buf  i      (Char.unsafe_chr (Int32_u.to_int (Int32_u.logand (Int32_u.shift_right_logical v 24) #0xffl)));
+  Bytes.unsafe_set buf (i+1)   (Char.unsafe_chr (Int32_u.to_int (Int32_u.logand (Int32_u.shift_right_logical v 16) #0xffl)));
+  Bytes.unsafe_set buf (i+2)   (Char.unsafe_chr (Int32_u.to_int (Int32_u.logand (Int32_u.shift_right_logical v  8) #0xffl)));
+  Bytes.unsafe_set buf (i+3)   (Char.unsafe_chr (Int32_u.to_int (Int32_u.logand v #0xffl)))
+
+(* --- Not migrated in OxStep03 --- *)
 
 let transform_from (_ctx : ctx) (_src : bytes) (_src_offset : int) = assert false
 let transform (_ctx : ctx) = assert false

@@ -84,4 +84,48 @@ let () =
   check "small_sigma0(0x00000001)" (small_sigma0 #0x00000001l) #0x02004000l;
   check "small_sigma1(0x00000001)" (small_sigma1 #0x00000001l) #0x0000a000l;
 
-  Printf.printf "\nAll OxStep02 checks complete.\n"
+  Printf.printf "\nAll OxStep02 checks complete.\n";
+
+  (* --- OxStep03: create / init / get_be32 / set_be32 --- *)
+
+  Printf.printf "\n=== create ===\n";
+  let ctx = create () in
+  Printf.printf "create: numbytes = %d  (expected 0)\n" ctx.numbytes;
+  check "create: state[0] = 0" (aget ctx.state 0) #0l;
+  check "create: data[0]  = 0" (aget ctx.data  0) #0l;
+
+  Printf.printf "\n=== init ===\n";
+  init ctx;
+  check "init: state[0]" (aget ctx.state 0) #0x6a09e667l;
+  check "init: state[1]" (aget ctx.state 1) #0xbb67ae85l;
+  check "init: state[2]" (aget ctx.state 2) #0x3c6ef372l;
+  check "init: state[3]" (aget ctx.state 3) #0xa54ff53al;
+  check "init: state[4]" (aget ctx.state 4) #0x510e527fl;
+  check "init: state[5]" (aget ctx.state 5) #0x9b05688cl;
+  check "init: state[6]" (aget ctx.state 6) #0x1f83d9abl;
+  check "init: state[7]" (aget ctx.state 7) #0x5be0cd19l;
+  Printf.printf "init: numbytes = %d  (expected 0)\n" ctx.numbytes;
+
+  Printf.printf "\n=== get_be32 ===\n";
+  let buf16 = Bytes.of_string
+    "\xde\xad\xbe\xef\x12\x34\x56\x78\x00\x00\x00\x00\xff\xff\xff\xff" in
+  check "get_be32 @ 0  = deadbeef" (get_be32 buf16  0) #0xdeadbeefl;
+  check "get_be32 @ 4  = 12345678" (get_be32 buf16  4) #0x12345678l;
+  check "get_be32 @ 8  = 00000000" (get_be32 buf16  8) #0x00000000l;
+  check "get_be32 @ 12 = ffffffff" (get_be32 buf16 12) #0xffffffffl;
+
+  Printf.printf "\n=== set_be32 ===\n";
+  let buf4 = Bytes.make 4 '\x00' in
+  set_be32 buf4 0 #0xdeadbeefl;
+  Printf.printf "set_be32 deadbeef bytes: %02x %02x %02x %02x  (expected de ad be ef)\n"
+    (Char.code (Bytes.get buf4 0)) (Char.code (Bytes.get buf4 1))
+    (Char.code (Bytes.get buf4 2)) (Char.code (Bytes.get buf4 3));
+  check "set_be32→get_be32 deadbeef" (get_be32 buf4 0) #0xdeadbeefl;
+  set_be32 buf4 0 #0x00000000l;
+  check "set_be32→get_be32 zero"     (get_be32 buf4 0) #0x00000000l;
+  set_be32 buf4 0 #0xffffffffl;
+  check "set_be32→get_be32 all-ones" (get_be32 buf4 0) #0xffffffffl;
+  set_be32 buf4 0 #0x80000000l;
+  check "set_be32→get_be32 msb-only" (get_be32 buf4 0) #0x80000000l;
+
+  Printf.printf "\nAll OxStep03 checks complete.\n"
