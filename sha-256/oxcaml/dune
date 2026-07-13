@@ -4,3 +4,10 @@
  (libraries stdlib_upstream_compatible)
  (ocamlopt_flags (:standard -extension layout_poly -O3))
  (modes native))
+
+(executable
+ (name sha256_tests)
+ (modules sha256 sha256_tests)
+ (libraries stdlib_upstream_compatible)
+ (ocamlopt_flags (:standard -extension layout_poly -O3))
+ (modes native))
