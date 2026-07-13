@@ -100,7 +100,7 @@ let create () = {
   length   = Array.make 2 0;
   numbytes = 0;
   buffer   = Bytes.make 64 '\x00';
-  data     = makearray_dynamic 80 #0l;
+  data     = makearray_dynamic 64 #0l;
 }
 
 let init ctx =
@@ -140,7 +140,7 @@ let transform_from ctx (src : bytes) (src_offset : int) =
     aset data i (get_be32 src (src_offset + (i lsl 2)))
   done;
   (* Expand message schedule: data[16..79] *)
-  for i = 16 to 79 do
+  for i = 16 to 63 do
     aset data i
       (Int32_u.add
         (Int32_u.add
