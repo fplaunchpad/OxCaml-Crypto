@@ -219,7 +219,56 @@ let transform_from ctx (src : bytes) (src_offset : int) =
 
 let transform ctx = transform_from ctx ctx.buffer 0
 
-(* --- Not migrated in OxStep04 --- *)
+(* --- Migrated in OxStep05 --- *)
 
-let add_data (_ctx : ctx) (_data : bytes) (_len : int) = assert false
-let finish (_ctx : ctx) (_output : bytes) = assert false
+let add_data ctx (data : bytes) len =
+  (* mask32 only needed here for the int-domain bit-length counter; int32# arithmetic elsewhere *)
+  let mask32 = 0xFFFF_FFFF in
+  let t = ctx.length.(1) in
+  let new_lo = (t + (len lsl 3)) land mask32 in
+  ctx.length.(1) <- new_lo;
+  if new_lo < t then
+    ctx.length.(0) <- (ctx.length.(0) + 1) land mask32;
+  ctx.length.(0) <- (ctx.length.(0) + (len lsr 29)) land mask32;
+  let pos = ref 0 in
+  let rem = ref len in
+  let early = ref false in
+  if ctx.numbytes <> 0 then begin
+    let space = 64 - ctx.numbytes in
+    if !rem < space then begin
+      Bytes.blit data 0 ctx.buffer ctx.numbytes !rem;
+      ctx.numbytes <- ctx.numbytes + !rem;
+      early := true
+    end else begin
+      Bytes.blit data 0 ctx.buffer ctx.numbytes space;
+      transform ctx;
+      pos := space;
+      rem := !rem - space
+    end
+  end;
+  if not !early then begin
+    while !rem >= 64 do
+      transform_from ctx data !pos;
+      pos := !pos + 64;
+      rem := !rem - 64
+    done;
+    Bytes.blit data !pos ctx.buffer 0 !rem;
+    ctx.numbytes <- !rem
+  end
+
+let finish ctx (output : bytes) =
+  let i = ref ctx.numbytes in
+  Bytes.set ctx.buffer !i '\x80';
+  incr i;
+  if !i > 56 then begin
+    Bytes.fill ctx.buffer !i (64 - !i) '\x00';
+    transform ctx;
+    i := 0
+  end;
+  Bytes.fill ctx.buffer !i (56 - !i) '\x00';
+  set_be32 ctx.buffer 56 (Int32_u.of_int ctx.length.(0));
+  set_be32 ctx.buffer 60 (Int32_u.of_int ctx.length.(1));
+  transform ctx;
+  for j = 0 to 7 do
+    set_be32 output (j lsl 2) (aget ctx.state j)
+  done

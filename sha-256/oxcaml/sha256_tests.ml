@@ -149,3 +149,40 @@ let () =
   check "transform: state[7] = 7852b855" (aget ctx2.state 7) #0x7852b855l;
 
   Printf.printf "\nAll OxStep04 checks complete.\n"
+
+let digest_of_string s =
+  let ctx = create () in
+  init ctx;
+  let data = Bytes.of_string s in
+  add_data ctx data (Bytes.length data);
+  let output = Bytes.make 32 '\x00' in
+  finish ctx output;
+  output
+
+let hex_of_bytes b =
+  let buf = Buffer.create 64 in
+  for i = 0 to Bytes.length b - 1 do
+    Buffer.add_string buf (Printf.sprintf "%02x" (Char.code (Bytes.get b i)))
+  done;
+  Buffer.contents buf
+
+let check_digest label got expected =
+  let pass = got = expected in
+  Printf.printf "%s:\n  got      %s\n  expected %s  %s\n"
+    label got expected (if pass then "OK" else "FAIL")
+
+let () =
+  Printf.printf "\n=== OxStep05: add_data + finish (RFC 4634 known-answer) ===\n";
+  check_digest {|SHA-256("")|}
+    (hex_of_bytes (digest_of_string ""))
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+  check_digest {|SHA-256("abc")|}
+    (hex_of_bytes (digest_of_string "abc"))
+    "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+  check_digest {|SHA-256("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq")|}
+    (hex_of_bytes (digest_of_string "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"))
+    "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1";
+  check_digest {|SHA-256("The quick brown fox jumps over the lazy dog")|}
+    (hex_of_bytes (digest_of_string "The quick brown fox jumps over the lazy dog"))
+    "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592";
+  Printf.printf "\nAll OxStep05 checks complete.\n"
