@@ -4,6 +4,28 @@
 
 ---
 
+## 📄 Technical Report
+
+This repository is accompanied by a comprehensive technical report that presents the complete research journey behind this project. The report documents the motivation, experimental methodology, optimization campaigns, assembly and performance analysis, cross-primitive findings, compiler observations, engineering decisions, and final conclusions.
+
+**📄 Technical Report (PDF):**
+`report/Performance_Engineering_of_Cryptographic_Primitives_in_OCaml_and_OxCaml.pdf`
+
+The report includes:
+
+- Research motivation and objectives
+- Experimental methodology
+- Optimization journey for every primitive
+- Assembly and performance investigations
+- Cross-primitive analysis
+- Compiler and runtime observations
+- Repository-wide findings
+- Future work and research directions
+
+Readers who want the complete technical narrative should begin with the PDF, while the repository provides the source code, benchmark data, optimization logs, and supporting documentation.
+
+---
+
 ## Research Question
 
 > How close can OCaml and OxCaml come to C for performance-critical cryptographic software — while retaining the safety advantages of the OCaml ecosystem? At what point does source-level optimization exhaust itself? What is the cost of the remaining gap, measured in instructions, hardware operations, and compiler limitations?
@@ -509,5 +531,29 @@ In every case, OCaml retains its core safety properties: type checking, memory s
 ## Looking Forward
 
 This repository established the methodology and evidence base for a natural extension: Poly1305 (GF(2¹³⁰−5) field arithmetic, multiply-dominated) would test whether `int32#`'s benefits generalize from the XOR-heavy SHA-256 workload to multiplication-heavy workloads. Combined with ChaCha20, it produces a complete ChaCha20-Poly1305 AEAD scheme (RFC 8439) — the natural step toward evaluating OxCaml for a full TLS 1.3 cryptographic stack.
+
+## Generating the PDF Report
+
+The full technical report is written in `technical-report.md` and converts to PDF via Pandoc and XeLaTeX. XeLaTeX is required (not pdfLaTeX).
+
+**Prerequisites:** [Pandoc](https://pandoc.org/installing.html) and a TeX Live / MiKTeX installation with XeLaTeX.
+
+Run from the repository root:
+
+```bash
+mkdir -p report
+
+pandoc technical-report.md \
+  --from markdown \
+  --toc \
+  --number-sections \
+  --pdf-engine=xelatex \
+  -V geometry:margin=1in \
+  -V colorlinks=true \
+  -V linkcolor=blue \
+  -o report/Performance_Engineering_of_Cryptographic_Primitives_in_OCaml_and_OxCaml.pdf
+```
+
+The output is written to `report/Performance_Engineering_of_Cryptographic_Primitives_in_OCaml_and_OxCaml.pdf`. All figure paths in `technical-report.md` are relative to the repository root, so invoke `pandoc` from there.
 
 > The complete synthesis of observations, cross-primitive comparisons, compiler behaviours, optimization patterns, and repository-wide findings is presented in `docs/cross-primitive-analysis.md` and, when complete, `docs/repository-summary.md`.
