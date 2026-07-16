@@ -6,23 +6,15 @@
 
 ## 📄 Technical Report
 
-This repository is accompanied by a comprehensive technical report that presents the complete research journey behind this project. The report documents the motivation, experimental methodology, optimization campaigns, assembly and performance analysis, cross-primitive findings, compiler observations, engineering decisions, and final conclusions.
+This repository is accompanied by a comprehensive technical report that documents the complete research journey, methodology, optimization campaigns, assembly investigations, benchmark analysis, cross-primitive findings, compiler observations, and final conclusions.
 
-**📄 Technical Report (PDF):**
-`report/Performance_Engineering_of_Cryptographic_Primitives_in_OCaml_and_OxCaml.pdf`
+**📄 Read the Technical Report (PDF):**  
+https://drive.google.com/file/d/154SGHgUQp1JcT7LucBMZ2y2JqkcLOJxv/view?usp=sharing
 
-The report includes:
+**📁 Repository copy:**  
+[report/Performance_Engineering_of_Cryptographic_Primitives_in_OCaml_and_OxCaml.pdf](report/Performance_Engineering_of_Cryptographic_Primitives_in_OCaml_and_OxCaml.pdf)
 
-- Research motivation and objectives
-- Experimental methodology
-- Optimization journey for every primitive
-- Assembly and performance investigations
-- Cross-primitive analysis
-- Compiler and runtime observations
-- Repository-wide findings
-- Future work and research directions
-
-Readers who want the complete technical narrative should begin with the PDF, while the repository provides the source code, benchmark data, optimization logs, and supporting documentation.
+The report can be read independently as a technical case study, while this repository contains the complete source code, benchmarks, optimization logs, assembly investigations, and supporting documentation.
 
 ---
 
