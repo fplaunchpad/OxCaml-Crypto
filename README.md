@@ -549,3 +549,7 @@ pandoc technical-report.md \
 The output is written to `report/Performance_Engineering_of_Cryptographic_Primitives_in_OCaml_and_OxCaml.pdf`. All figure paths in `technical-report.md` are relative to the repository root, so invoke `pandoc` from there.
 
 > The complete synthesis of observations, cross-primitive comparisons, compiler behaviours, optimization patterns, and repository-wide findings is presented in `docs/cross-primitive-analysis.md` and, when complete, `docs/repository-summary.md`.
+
+## Acknowledgements
+
+This project was carried out by **V. Krishna** under the guidance and supervision of **Prof. K. C. Sivaramakrishnan** as part of a research internship at IIT Madras.
