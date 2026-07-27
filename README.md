@@ -552,4 +552,4 @@ The output is written to `report/Performance_Engineering_of_Cryptographic_Primit
 
 ## Acknowledgements
 
-This project was carried out by **V. Krishna** under the guidance and supervision of **Prof. K. C. Sivaramakrishnan** as part of a research internship at IIT Madras.
+This project was carried out by **V. Krishnan** under the guidance and supervision of **Prof. K. C. Sivaramakrishnan** as part of a research internship at IIT Madras.
