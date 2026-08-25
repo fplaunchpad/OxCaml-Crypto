@@ -2,6 +2,8 @@
 
 *An assembly-guided compiler research study measuring how close OCaml and OxCaml can come to C for performance-critical cryptographic software.*
 
+**[Read the project manifesto](manifesto.md)**
+
 ---
 
 ## 📄 Technical Report
