@@ -2,17 +2,17 @@
 
 ## Background
 
-OCaml's cryptographic ecosystem currently relies on high-performance implementations written in C, wrapped by thin OCaml bindings. OxCaml was created to close the performance gap between OCaml and Rust. In the Rust ecosystem, by contrast, cryptographic libraries are implemented directly in Rust itself, without falling back to C. This project investigates whether the same is achievable in OxCaml: implementing cryptographic primitives natively, rather than wrapping existing C implementations.
+OCaml's cryptographic ecosystem currently relies on high-performance implementations written in C, wrapped by thin OCaml bindings. [OxCaml](https://oxcaml.org/) was created to close the performance gap between OCaml and Rust. In the Rust ecosystem, by contrast, cryptographic libraries are implemented directly in Rust itself, without falling back to C. This project investigates whether the same is achievable in OxCaml: implementing cryptographic primitives natively, rather than wrapping existing C implementations.
 
 ## Research Question
 
 The core question is not whether native cryptographic implementations in OxCaml are possible in principle, that is already known to be feasible, but how well they can be made to perform. The project is framed as an exploration of the gap between what OxCaml offers today and the performance ceiling it could reach, rather than as a novel algorithmic contribution.
 
-Preliminary investigation has already surfaced a concrete example of this gap: certain SIMD instructions required for high-performance cryptographic operations are not currently exposed by OxCaml. Identifying gaps of this kind, and what would be needed to close them, is a central part of the project's output, potentially even as upstream contributions to OxCaml itself.
+Preliminary investigation has already surfaced a concrete example of this gap: certain [SIMD](https://en.wikipedia.org/wiki/Single_instruction,_multiple_data) instructions required for high-performance cryptographic operations are not currently exposed by OxCaml. Identifying gaps of this kind, and what would be needed to close them, is a central part of the project's output, potentially even as upstream contributions to OxCaml itself.
 
 ## Reference Point
 
-The project takes **libcrux** as its model, a formally verified cryptographic library built from a Rust implementation. libcrux's verification work is treated as out of scope for now; the immediate objective is to build an OxCaml equivalent of libcrux's underlying primitives. Verification and formal proof of these implementations are considered a distinct, later-stage research question, not a goal of this initial phase.
+The project takes **[libcrux](https://github.com/cryspen/libcrux)** as its model, a formally verified cryptographic library built from a Rust implementation. libcrux's verification work is treated as out of scope for now; the immediate objective is to build an OxCaml equivalent of libcrux's underlying primitives. Verification and formal proof of these implementations are considered a distinct, later-stage research question, not a goal of this initial phase.
 
 ## Goals
 
